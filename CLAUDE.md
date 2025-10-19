@@ -2,13 +2,59 @@
 
 このプロジェクトは、Elysiaフレームワークを使用し、クリーンアーキテクチャの原則に沿って構築されたAPIです。
 
+---
+
+## ⚠️ 最重要ルール
+
+### バックエンドコード修正時の必須事項
+
+**バックエンドのコード（`src/`配下）のいずれかを修正した場合、必ず以下を実行してください：**
+
+```bash
+bun run test
+```
+
+#### ルール
+
+1. **コード修正後は必ずテストを実行する**
+   - `src/`配下のファイルを修正したら、必ず`bun run test`を実行
+
+2. **エラーが発生した場合は必ず修正する**
+   - テストが失敗した場合、コードを修正してエラーを解消
+
+3. **テストは必ず全て成功させる**
+   - テスト結果は必ず**0 fail**で全て成功しなければなりません
+   - 失敗したテストを残したままコミットしない
+
+#### テスト成功の例
+
+```bash
+ 12 pass
+ 0 fail   ← 必ず0 failであること
+ 40 expect() calls
+Ran 12 tests across 1 files. [196.00ms]
+```
+
+#### ❌NG例（失敗したテストがある）
+
+```bash
+ 10 pass
+ 2 fail   ← これはNG！修正が必要
+ 40 expect() calls
+```
+
+**このルールを守ることで、コードの品質を保ち、デグレードを防ぎます。**
+
+---
+
 ## 目次
 
 1. [ディレクトリ構造](#ディレクトリ構造)
 2. [依存性の注入 (DI)](#依存性の注入-di)
 3. [OpenAPI自動生成](#openapi自動生成)
 4. [エラーハンドリング](#エラーハンドリング)
-5. [開発ガイド](#開発ガイド)
+5. [テスト](#テスト)
+6. [開発ガイド](#開発ガイド)
 
 ---
 
@@ -45,6 +91,13 @@ src/
 │       └── router.ts           # ルーティング定義
 │
 └── index.ts                     # アプリケーションエントリーポイント
+
+test/
+├── helpers/                     # テストヘルパー関数
+│   └── createTestApp.ts        # テスト用Elysiaアプリ作成
+├── mocks/                       # モックオブジェクト
+│   └── mockUserRepository.ts   # モックUserRepository
+└── users.test.ts                # ユーザーエンドポイントのテスト
 ```
 
 ### 各層の責務
@@ -440,7 +493,162 @@ export const userRouter = new Elysia({ prefix: "/users" })
 
 ---
 
+## テスト
+
+### 概要
+
+このプロジェクトでは、Bunの組み込みテストランナーを使用してユニットテストを実装しています。
+テストは**AAA（Arrange-Act-Assert）パターン**に従って構造化されています。
+
+### テストの実行
+
+```bash
+# すべてのテストを実行
+bun test
+
+# 特定のテストファイルを実行
+bun test test/users.test.ts
+```
+
+### テストの構造
+
+テストコードは以下の3つのセクションに分離されています：
+
+```typescript
+it("テストの説明", async () => {
+  // Setup
+  // テストの準備（データ作成、モックのセットアップなど）
+
+  // Execute
+  // テストの実行（APIリクエスト送信など）
+
+  // Assert
+  // テスト結果の検証（期待値との比較）
+});
+```
+
+### テストの基本構造
+
+#### 1. テストアプリケーションの作成
+
+`createTestApp`ヘルパー関数を使用して、エラーハンドラー付きのElysiaアプリを作成します。
+
+```typescript
+import { createTestApp } from "./helpers/createTestApp";
+
+// プレフィックス付き
+const app = createTestApp("/users");
+
+// プレフィックスなし
+const app = createTestApp();
+```
+
+#### 2. モックリポジトリの使用
+
+テスト用のモックリポジトリをDIコンテナに注入します。
+
+```typescript
+import { MockUserRepository } from "./mocks/mockUserRepository";
+
+beforeEach(() => {
+  // DIコンテナをリセット
+  container.reset();
+
+  // モックリポジトリを作成
+  mockRepository = new MockUserRepository();
+  mockRepository.setUsers(sampleUsers);
+
+  // DIコンテナにモックリポジトリを登録
+  container.registerSingleton(
+    DI_KEYS.INTERNAL_USER_REPOSITORY,
+    () => mockRepository
+  );
+});
+```
+
+### テストの例
+
+```typescript
+describe("GET /users/:id", () => {
+  it("IDでユーザーを取得できる", async () => {
+    // Setup
+    // beforeEachで準備済み
+
+    // Execute
+    const response = await app.handle(
+      new Request("http://localhost/users/1")
+    );
+
+    // Assert
+    expect(response.status).toBe(200);
+
+    const user = await response.json();
+    expect(user.id).toBe(1);
+    expect(user.name).toBe("Test User 1");
+    expect(user.email).toBe("test1@example.com");
+  });
+
+  it("ユーザーが存在しない場合は404を返す", async () => {
+    // Setup
+    // beforeEachで準備済み
+
+    // Execute
+    const response = await app.handle(
+      new Request("http://localhost/users/999")
+    );
+
+    // Assert
+    expect(response.status).toBe(404);
+
+    const error = await response.json();
+    expect(error.error).toBe("NotFoundError");
+    expect(error.message).toContain("User with id 999 not found");
+  });
+});
+```
+
+### テストディレクトリ構造
+
+```
+test/
+├── helpers/              # テストヘルパー関数
+│   └── createTestApp.ts # テスト用Elysiaアプリ作成
+├── mocks/               # モックオブジェクト
+│   └── mockUserRepository.ts
+└── users.test.ts        # ユーザーエンドポイントのテスト
+```
+
+### AAAパターンの詳細
+
+詳細なテストの書き方については、[test/CLAUDE.md](./test/CLAUDE.md)を参照してください。
+
+### テストのベストプラクティス
+
+1. **Setup, Execute, Assertを明確に分離**: 各セクションにコメントを追加
+2. **createTestAppを使用**: エラーハンドラーなどの共通設定を含む
+3. **モックリポジトリを活用**: 外部依存をモックで置き換え
+4. **日本語のテスト説明**: 可読性を重視
+5. **beforeEachでセットアップ**: 各テストの前に初期化
+
+---
+
 ## 開発ガイド
+
+### ⚠️ コード修正時の必須ルール
+
+**バックエンドコード（`src/`配下）を修正した場合、必ず以下を実行してください：**
+
+```bash
+bun run test
+```
+
+- テスト結果は必ず**0 fail**で全て成功させること
+- エラーが発生した場合は必ず修正すること
+- 失敗したテストを残したままコミットしないこと
+
+詳細は[最重要ルール](#最重要ルール)を参照してください。
+
+---
 
 ### 新しいエンドポイントの追加
 
@@ -449,6 +657,7 @@ export const userRouter = new Elysia({ prefix: "/users" })
 3. **API層**: requests/responses/usecase/controller/routerを作成
 4. **DI層**: 依存関係を登録
 5. **index.ts**: ルーターをアプリケーションに追加
+6. **⚠️ テストを実行**: `bun run test`で全てのテストが成功することを確認
 
 ### サーバーの起動
 
@@ -486,5 +695,12 @@ bun run start
 - **型安全性**: Inferによるスキーマファーストな開発
 - **自動ドキュメント生成**: OpenAPIによるAPI仕様の自動生成
 - **統一的なエラーハンドリング**: グローバルミドルウェアによる一貫したエラー処理
+- **包括的なテスト**: AAAパターンによる構造化されたテスト
 
 これらの原則により、保守性、拡張性、テスタビリティの高いAPIを実現しています。
+
+### ⚠️ 開発時の重要な注意事項
+
+**コード修正後は必ず`bun run test`を実行し、全てのテストが成功すること（0 fail）を確認してください。**
+
+これにより、コードの品質を保ち、デグレードを防ぐことができます。
