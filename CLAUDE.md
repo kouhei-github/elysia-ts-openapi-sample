@@ -652,12 +652,54 @@ bun run test
 
 ### 新しいエンドポイントの追加
 
-1. **Domain層**: エンティティとリポジトリインターフェースを定義
-2. **Infrastructure層**: リポジトリの具体的実装を追加
-3. **API層**: requests/responses/usecase/controller/routerを作成
-4. **DI層**: 依存関係を登録
-5. **index.ts**: ルーターをアプリケーションに追加
-6. **⚠️ テストを実行**: `bun run test`で全てのテストが成功することを確認
+#### 🚀 新規エンドポイントの作成（推奨）
+
+**新しいエンドポイントを作成する場合は、自動生成スクリプトを使用してください。**
+
+```bash
+# コマンドライン引数モード（推奨）
+bun run ddd <scope> <entities>
+
+# 例: publicスコープでproductsエンドポイントを生成
+bun run ddd public products
+
+# 例: userスコープでordersエンドポイントを生成
+bun run ddd user orders
+
+# 例: adminスコープでsettingsエンドポイントを生成
+bun run ddd admin settings
+```
+
+**生成されるファイル（10個）:**
+- ✅ `src/domain/{entity}/entity.ts`
+- ✅ `src/domain/interface/repository/{entity}Repository.ts`
+- ✅ `src/infrastructure/repository/{entity}Repository.ts`
+- ✅ `src/di/{entities}.ts`
+- ✅ `src/api/{scope}/{entities}/requests.ts`
+- ✅ `src/api/{scope}/{entities}/responses.ts`
+- ✅ `src/api/{scope}/{entities}/usecase.ts`
+- ✅ `src/api/{scope}/{entities}/controller.ts`
+- ✅ `src/api/{scope}/{entities}/router.ts`
+- ✅ `test/{entities}.test.ts`
+- ✅ `test/mocks/mock{Entity}Repository.ts`
+
+**生成後の手順:**
+1. **src/index.tsにルーターを追加**
+   ```typescript
+   import { {entity}Router } from "./api/{scope}/{entities}/router";
+   app.use({entity}Router);
+   ```
+2. **⚠️ テストを実行**: `bun run test`で全てのテストが成功することを確認
+
+#### 📝 既存エンドポイントの更新
+
+既存のエンドポイントを修正する場合は、該当するファイルを直接編集してください：
+
+1. **Domain層**: エンティティとリポジトリインターフェースを修正
+2. **Infrastructure層**: リポジトリの具体的実装を修正
+3. **API層**: requests/responses/usecase/controller/routerを修正
+4. **DI層**: 依存関係を修正（必要に応じて）
+5. **⚠️ テストを実行**: `bun run test`で全てのテストが成功することを確認
 
 ### サーバーの起動
 

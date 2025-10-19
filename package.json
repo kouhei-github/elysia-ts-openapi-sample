@@ -4,7 +4,8 @@
   "scripts": {
     "test": "bun test",
     "dev": "bun run --watch src/index.ts",
-    "start": "bun run src/index.ts"
+    "start": "bun run src/index.ts",
+    "ddd": "bun run etc/scripts/generate-endpoint.ts"
   },
   "dependencies": {
     "@elysiajs/openapi": "^1.4.11",
